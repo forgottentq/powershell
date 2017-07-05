@@ -1,20 +1,22 @@
 ## Collection script.
 #
-#
+# User input controller information IP addresses or hostnames.
 $controllers = @()
 do {
  $input = (Read-Host "Please enter controller IPs, one at a time, on a new line.  Leave blank when finished and press enter.")
  if ($input -ne '') {$controllers += $input}
 }
 until ($input -eq '')
-
-
+#
+# Folder for CSV export 
 $folder = $(read-host "Please Specify Path for CSV exports, E:  C:\reports\")
+# Prompt for credentials to connecto to netapp controllers.
 write-host "Please enter credentials to connect to Netapp Controllers"
 $cred = get-credential
-
+#
 $vms = $null
 $vms = @()
+# Begin collection, starting with first controller, and then looping through all controllers.
 foreach ($controller in $controllers) {
 write-progress "Collecting all folder structure data except Vol0"
 	try {
@@ -25,15 +27,18 @@ write-progress "Collecting all folder structure data except Vol0"
 		Continue
 	}
 	$vols = get-navol | where {$_.Name -notlike "vol0"}
+######## Building volume information and adding new objects to $vms	
 	foreach ($vol in $vols) {
 		$vms += New-Object PSOBject -Property @{
 			"Volume" = $vol.Name
 		}
 		$vmdirs = Read-NaDirectory -Path "/vol/$vol" | where {$_.Name -notlike "." -and $_.Name -notlike ".." }
+		#### Building VM directory information and adding new VMName objects to $vms
 		foreach ($vm in $vmdirs) {
 			$vms += New-Object PSObject -Property @{
 				"VMName" = $vm.Name
 			}
+			#### Building file information for each VM directory and adding new Path objects to $vms.
 			$files = Read-NaDirectory -Path "/vol/$vol/$vm" | where {$_.Name -notlike "." -and $_.Name -notlike ".."}
 			foreach ($file in $files) {
 				$location = get-NaFile -Path "/vol/$vol/$vm/$file" 
@@ -43,6 +48,7 @@ write-progress "Collecting all folder structure data except Vol0"
 			}
 		}
 	}
+	#### Finally exporting all Volume, VMName, and Path objects out to CSV named with $folder which is defined at the top, and $controller that is in the loop.
 }  $vms | Select Volume,VMName,Path | Export-CSV $folder$controller.csv
 
 
