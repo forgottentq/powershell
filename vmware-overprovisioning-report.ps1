@@ -4,6 +4,7 @@
 ### ended up skewing my report data. :). 
 
 function vmware-provisioning {
+	$cred = get-credential
 	$viservers = "vcenter1", "vcenter2", "vcenter3"
 	$date = (Get-Date).tostring("yyyyMMdd")
 	Add-PSSnapin Vmware.VIMAutomation.Core | Out-Null
