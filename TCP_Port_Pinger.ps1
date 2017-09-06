@@ -22,7 +22,7 @@ function test-port {
 	}
 }
 
-function test-port-ping($ip, $port, $count) {
+function test-port-ping($ip, $port) {
 ## Usage:  test-port-ping ip.ip.ip.ip 443
 	$count = read-host "Enter Ping Count You wish to test:"
 	$negative = $null
