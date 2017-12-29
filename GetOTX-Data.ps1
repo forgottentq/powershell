@@ -1,5 +1,6 @@
 function GetOTX-Data {
         $otxkey = "YOUR_API_KEY_HERE"
+        $exports = "DEFINE_YOUR_CSV_EXPORT_LOCATION_HERE"
         $URLs = $null
         $FileHashesEPO = $null
         $FileHashesPalo = $null
@@ -16,7 +17,6 @@ function GetOTX-Data {
         $FileHashesEPO = @()
         $FileHashesPalo = @()
         $Emails = @()
-        $exports = "C:\users\bayesw\desktop\exports\"
         $date = get-date
         $next = "https://otx.alienvault.com/api/v1/indicators/export?page=1"
         do {
