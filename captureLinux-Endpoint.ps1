@@ -1,3 +1,7 @@
+#
+# This script uses Posh-SSH module and requires tcpdump be installed on the endpoint to function correctly. 
+# Subsitute "dzdo" commands with sudo if you do not use Centrify in your organization
+#
 function captureLinux-endpoint {
         $date = get-date
         $stamp = "$($date.Month)_$($date.day)_$($date.year)_$($date.hour)_$($date.minute)"
