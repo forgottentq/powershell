@@ -1,4 +1,7 @@
-function find-streams($location) {
+#
+# Usage:   Find-Streams "C:\"
+#
+function Find-Streams($location) {
 	$files = get-childitem -Recurse -Path $location -erroraction SilentlyContinue
 	foreach ($file in $files){
 		$streams = get-item -path $file.Fullname -stream * | where {$_.Stream -ne ':$DATA' -and $_.Stream -ne 'Zone.Identifier'}
