@@ -5,6 +5,7 @@
 #
 # Define Main Function, set variables to Null, and then define as arrays. 
 function GetOTX-Data {
+	clear
 	$otxkey = "YOUR API KEY GOES HERE"
         $exports = "C:\Exports\" #Define your Export Location Here!
 	$FileHashesEPO = $null
