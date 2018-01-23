@@ -1,13 +1,16 @@
 
 #
-# Powershell script to pull indicators from Alien Vault Opensource Threat Exchange and export to CSVs for importing into Arcsight or other SIEM.
+# Powershell script to pull indicators from Alien Vault Opensource Threat Exchange(OTX) and export to CSVs for importing into Arcsight or other SIEM.
 #
 #
 # Define Main Function, set variables to Null, and then define as arrays. 
 function GetOTX-Data {
 	clear
-	$otxkey = "YOUR API KEY GOES HERE"
-        $exports = "C:\Exports\" #Define your Export Location Here!
+	# Insert your API below.
+	$otxkey = "YOUR API KEY HERE"
+	# Define export location.
+	$exports = "C:\Exports"
+	#
 	$FileHashesEPO = $null
 	$FileHashesPalo = $null
 	$hostnames = $null
@@ -16,6 +19,7 @@ function GetOTX-Data {
 	$Emails = $null
 	$URLs = $null
 	$CVEs = $null
+	$counts = $null
 	$hostnames = @()
 	$IPV4s = @()
 	$IPV6s = @()
@@ -24,6 +28,7 @@ function GetOTX-Data {
 	$FileHashesPalo = @()
 	$Emails = @()
 	$CVEs = @()
+	$counts = @()
 	;""
 	;""
 	;""
@@ -58,11 +63,11 @@ function GetOTX-Data {
  .   .       .      :  .   .: ::/  .  .::\
 
 "@
-	#Write out pretty ascii art to the screen.
+	# Write out pretty ascii art to the screen.
 	write-host "$alien"
-	#Define our Error preference.
+	# Define our Error preference.
 	$ErrorActionPreference = "SilentlyContinue"
-	#Archive previous days export into the archive folder.
+	# Archive previous days export into the archive folder.
 	$archive = get-childitem "$exports\*.csv"
 	if ($archive -ne $null){
 		Move-Item $archive "$exports\archive\" -Force
@@ -70,62 +75,81 @@ function GetOTX-Data {
 	} else {
 		write-host "No previous CSV's to archive. Continuing" -foregroundcolor "Yellow"
 	}
-	#Get the date for naming CSV exports at the end.
+	# Get the date for naming CSV exports at the end.
 	$date = get-date
-	#Define first page to begin.
+	# Define a bit of regex for later
+	$regex = "[^a-zA-Z]"
+	# Define first page to begin.
 	$next = "https://otx.alienvault.com/api/v1/pulses/subscribed/?limit=50&page=1"
 	do {
-		write-progress "Pulling all AlienVault indicators and exporting to CSVs"
+		write-progress "Pulling all AlienVault indicators and exporting to CSVs. Processing page: $page"
 		$indicators = invoke-webrequest -URI $next -UseBasicParsing -Headers @{"X-OTX-API-KEY"="$otxkey"} -UseDefaultCredentials
 		# Convert JSON data received into powershell object.
 		$data = $indicators.Content | ConvertFrom-Json
 		# Populate the next page into $next variable.
 		$next = $data.next
-		if ($data.Results){
-			write-progress "Processing:  $next"
-			foreach ($item in $data.Results.indicators){
-				# Gather Domain and Subdomain Names Indicators
-				if ($item.Type -eq "hostname" -or $item.type -eq "domain"){
-					#$hostnames += new-object PSObject -Property @{"Hostname"="$($item.Indicator)"; b="b"}
-					$hostnames += new-object PSObject -Property @{"Hostname"="$($item.Indicator)"}
-				}
-				#Gather All IPV4 Indicators
-				if ($item.Type -eq "IPv4"){
-					$IPV4s += new-object PSObject -Property @{"IPv4 Address"="$($item.Indicator)"}
-				}
-				#Gather All IPV6 Indicators
-				if ($item.Type -eq "IPv6"){
-					$IPV6s += new-object PSObject -Property @{"IPv6 Address"="$($item.Indicator)"}
-				}
-				#Gather All URL Indicators
-				if ($item.Type -eq "URL"){
-					if ($item.indicator -like "*http://*" -or $item.indicator -like "*https://*"){
-						$URLs += new-object PSObject -Property @{"URL"="$($item.indicator)"}
-					} else {
-						$URLs += new-object PSObject -Property @{"URL"="http://$($item.indicator)"}
+		$page = $next.split("&")[1].split("=")[1]
+		#
+		$filtered = $data.Results | where {$_.References -ne $null}
+		if ($filtered){
+			foreach ($item in $filtered){
+				$name = $null
+				$name = $item.Name -replace $regex
+				foreach ($indicator in $Item.Indicators) {
+					# Gather Domain and Subdomain Names Indicators
+					if ($indicator.Type -eq "hostname" -or $indicator.type -eq "domain"){
+						if ($item.References -like "*http*") {
+							$hostnames += new-object PSObject -Property @{"Hostname"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select Hostname,Name,Reference
+						}
 					}
-				}
-				#Gather all File Hash Indicators
-				if ($item.Type -eq "FileHash-MD5" -or $item.Type -eq "FileHash-SHA1" -or $item.Type -eq "Filehash-SHA256"){
-					$FileHashesEPO += new-object PSObject -Property @{"FileHash"="AppHash: $($item.Indicator)"}
-					$FileHashesPalo += new-object PSObject -Property @{"FileHash"="$($item.Indicator)"}
-				}
-				#Gather all Email Indicators
-				if ($item.Type -eq "email"){
-					$Emails += new-object PSObject -Property @{"Email"="$($item.Indicator)"}
-				}
-				if ($item.Type -eq "CVE"){
-					$CVEs += new-object PSObject -Property @{"Email"="$($item.Indicator)"}
+					# Gather All IPV4 Indicators
+					if ($indicator.Type -eq "IPv4"){
+						if ($item.References -like "*http*"){
+							$IPV4s += new-object PSObject -Property @{"IPv4 Address"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select "IPv4 Address",Name,Reference
+						}
+					}
+					# Gather All IPV6 Indicators
+					if ($indicator.Type -eq "IPv6"){
+						if ($item.References -like "*http*"){
+							$IPV6s += new-object PSObject -Property @{"IPv6 Address"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select "IPv6 Address",Name,Reference
+						}
+					}
+					# Gather All URL Indicators
+					if ($indicator.Type -eq "URL"){
+						if ($item.References -like "*http*"){
+							$URLs += new-object PSObject -Property @{"URL"="$($indicator.indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select URL,Name,Reference
+						}
+					}
+					# Gather all File Hash Indicators
+					if ($indicator.Type -eq "FileHash-MD5" -or $indicator.Type -eq "FileHash-SHA1" -or $indicator.Type -eq "Filehash-SHA256"){
+						if ($item.References -like "*http*"){
+							if ($item.References -ne $null -and $item.References -like "*http*"){
+								$FileHashesEPO += new-object PSObject -Property @{"FileHash"="AppHash: $($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select FileHash,Name,Reference
+								$FileHashesPalo += new-object PSObject -Property @{"FileHash"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select FileHash,Name,Reference
+							}
+						}
+					}
+					# Gather all Email Indicators
+					if ($indicator.Type -eq "email"){
+						if ($item.References -like "*http*"){
+							$Emails += new-object PSObject -Property @{"Email"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select Email,Name,Reference
+						}
+					}
+					if ($indicator.Type -eq "CVE"){
+						if ($item.References -like "*http*"){
+							$CVEs += new-object PSObject -Property @{"CVE"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select CVE,Name,Reference
+						}
+					}
 				}
 			}
 		}
 	} while ($next -ne $null)
-	## Export all indicators to CSVs if data exists in each object.
+	# Export all indicators to CSVs if data exists in each object.
 	if ($hostnames){
-		$hostnames | ConvertTo-Csv -NoTypeInformation | select -Skip 1 | Set-Content "$($exports)hostnames_$($date.month)_$($date.day)_$($date.year).csv"
+		$hostnames | ConvertTo-Csv -NoTypeInformation | Select -Skip 1 | Set-Content "$($exports)Hostnames_$($date.month)_$($date.day)_$($date.year).csv"
 	}
 	if ($IPV4s) {
-		$IPV4s | ConvertTo-Csv -NoTypeInformation | select -Skip 1 | Set-Content "$($exports)IPV4s_$($date.month)_$($date.day)_$($date.year).csv"
+		$IPV4s | ConvertTo-Csv -NoTypeInformation | Select -Skip 1 | Set-Content "$($exports)IPV4s_$($date.month)_$($date.day)_$($date.year).csv"
 	}
 	if ($IPV6s) {
 		$IPV6s | ConvertTo-Csv -NoTypeInformation | select -Skip 1 | Set-Content "$($exports)IPV6s_$($date.month)_$($date.day)_$($date.year).csv"
@@ -145,5 +169,11 @@ function GetOTX-Data {
 	if ($CVEs){
 		$CVEs | ConvertTo-Csv -NoTypeInformation | select -Skip 1 | Set-Content "$($exports)CVEs_$($date.month)_$($date.day)_$($date.year).csv"
 	}
+	# Total up the indicators and create a CSV just for number tracking.
+	$total = $hostnames.count + $IPv4s.count + $URLs.count + $FileHashesEPO.count + $Emails.count + $CVEs.count
+	$counts += new-object PSObject -Property @{"Hostnames"="$($hostnames.count)"; "IPv4s"="$($hostnames.count)"; "URLs"="$($URLs.Count)"; "FileHashes"="$($FileHashesEPO.count)"; "Emails"="$($Emails.Count)"; "CVEs"="$($CVEs.count)"; "Total"="$($total)"} | Select Hostnames,IPv4s,URLs,FileHashes,Emails,CVEs,Total
+	$counts | Export-csv "$($exports)Total_Numbers_$($date.month)_$($date.day)_$($date.year).csv"
+	# Open exports folder and complete the operation.
+	write-host "Opening exports folder..." -foregroundcolor "green"
+	ii $exports
 }
-#
