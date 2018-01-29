@@ -4,12 +4,16 @@
 #
 #
 # Define Main Function, set variables to Null, and then define as arrays. 
+#
+# Required VARS to set are:  $otxkey, $exports, and $daysold
+#
 function GetOTX-Data {
 	clear
-	# Insert your API below.
 	$otxkey = "YOUR API KEY HERE"
 	# Define export location.
-	$exports = "C:\Exports"
+	$exports = "C:\Exports\"
+	# How old are indicators allowed to be in days
+	$daysold = "90"
 	#
 	$FileHashesEPO = $null
 	$FileHashesPalo = $null
@@ -20,6 +24,7 @@ function GetOTX-Data {
 	$URLs = $null
 	$CVEs = $null
 	$counts = $null
+	$total = $null
 	$hostnames = @()
 	$IPV4s = @()
 	$IPV6s = @()
@@ -80,7 +85,7 @@ function GetOTX-Data {
 	# Define a bit of regex for later
 	$regex = "[^a-zA-Z]"
 	# Define first page to begin.
-	$next = "https://otx.alienvault.com/api/v1/pulses/subscribed/?limit=50&page=1"
+	$next = "https://otx.alienvault.com/api/v1/pulses/subscribed/?limit=10&page=1"
 	do {
 		write-progress "Pulling all AlienVault indicators and exporting to CSVs. Processing page: $page"
 		$indicators = invoke-webrequest -URI $next -UseBasicParsing -Headers @{"X-OTX-API-KEY"="$otxkey"} -UseDefaultCredentials
@@ -95,49 +100,52 @@ function GetOTX-Data {
 			foreach ($item in $filtered){
 				$name = $null
 				$name = $item.Name -replace $regex
-				foreach ($indicator in $Item.Indicators) {
-					# Gather Domain and Subdomain Names Indicators
-					if ($indicator.Type -eq "hostname" -or $indicator.type -eq "domain"){
-						if ($item.References -like "*http*") {
-							$hostnames += new-object PSObject -Property @{"Hostname"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select Hostname,Name,Reference
-						}
-					}
-					# Gather All IPV4 Indicators
-					if ($indicator.Type -eq "IPv4"){
-						if ($item.References -like "*http*"){
-							$IPV4s += new-object PSObject -Property @{"IPv4 Address"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select "IPv4 Address",Name,Reference
-						}
-					}
-					# Gather All IPV6 Indicators
-					if ($indicator.Type -eq "IPv6"){
-						if ($item.References -like "*http*"){
-							$IPV6s += new-object PSObject -Property @{"IPv6 Address"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select "IPv6 Address",Name,Reference
-						}
-					}
-					# Gather All URL Indicators
-					if ($indicator.Type -eq "URL"){
-						if ($item.References -like "*http*"){
-							$URLs += new-object PSObject -Property @{"URL"="$($indicator.indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select URL,Name,Reference
-						}
-					}
-					# Gather all File Hash Indicators
-					if ($indicator.Type -eq "FileHash-MD5" -or $indicator.Type -eq "FileHash-SHA1" -or $indicator.Type -eq "Filehash-SHA256"){
-						if ($item.References -like "*http*"){
-							if ($item.References -ne $null -and $item.References -like "*http*"){
-								$FileHashesEPO += new-object PSObject -Property @{"FileHash"="AppHash: $($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select FileHash,Name,Reference
-								$FileHashesPalo += new-object PSObject -Property @{"FileHash"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select FileHash,Name,Reference
+				$LastModified = get-date $item.Modified
+				if ($LastModified -gt (get-date).AddDays("-$daysold")){
+					foreach ($indicator in $Item.Indicators) {
+						# Gather Domain and Subdomain Names Indicators
+						if ($indicator.Type -eq "hostname" -or $indicator.type -eq "domain"){
+							if ($item.References -like "*http*") {
+								$hostnames += new-object PSObject -Property @{"Hostname"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select Hostname,Name,Reference
 							}
 						}
-					}
-					# Gather all Email Indicators
-					if ($indicator.Type -eq "email"){
-						if ($item.References -like "*http*"){
-							$Emails += new-object PSObject -Property @{"Email"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select Email,Name,Reference
+						# Gather All IPV4 Indicators
+						if ($indicator.Type -eq "IPv4"){
+							if ($item.References -like "*http*"){
+								$IPV4s += new-object PSObject -Property @{"IPv4 Address"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select "IPv4 Address",Name,Reference
+							}
 						}
-					}
-					if ($indicator.Type -eq "CVE"){
-						if ($item.References -like "*http*"){
-							$CVEs += new-object PSObject -Property @{"CVE"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select CVE,Name,Reference
+						# Gather All IPV6 Indicators
+						if ($indicator.Type -eq "IPv6"){
+							if ($item.References -like "*http*"){
+								$IPV6s += new-object PSObject -Property @{"IPv6 Address"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select "IPv6 Address",Name,Reference
+							}
+						}
+						# Gather All URL Indicators
+						if ($indicator.Type -eq "URL"){
+							if ($item.References -like "*http*"){
+								$URLs += new-object PSObject -Property @{"URL"="$($indicator.indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select URL,Name,Reference
+							}
+						}
+						# Gather all File Hash Indicators
+						if ($indicator.Type -eq "FileHash-MD5" -or $indicator.Type -eq "FileHash-SHA1" -or $indicator.Type -eq "Filehash-SHA256"){
+							if ($item.References -like "*http*"){
+								if ($item.References -ne $null -and $item.References -like "*http*"){
+									$FileHashesEPO += new-object PSObject -Property @{"FileHash"="AppHash: $($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select FileHash,Name,Reference
+									$FileHashesPalo += new-object PSObject -Property @{"FileHash"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select FileHash,Name,Reference
+								}
+							}
+						}
+						# Gather all Email Indicators
+						if ($indicator.Type -eq "email"){
+							if ($item.References -like "*http*"){
+								$Emails += new-object PSObject -Property @{"Email"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select Email,Name,Reference
+							}
+						}
+						if ($indicator.Type -eq "CVE"){
+							if ($item.References -like "*http*"){
+								$CVEs += new-object PSObject -Property @{"CVE"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select CVE,Name,Reference
+							}
 						}
 					}
 				}
@@ -171,8 +179,8 @@ function GetOTX-Data {
 	}
 	# Total up the indicators and create a CSV just for number tracking.
 	$total = $hostnames.count + $IPv4s.count + $URLs.count + $FileHashesEPO.count + $Emails.count + $CVEs.count
-	$counts += new-object PSObject -Property @{"Hostnames"="$($hostnames.count)"; "IPv4s"="$($hostnames.count)"; "URLs"="$($URLs.Count)"; "FileHashes"="$($FileHashesEPO.count)"; "Emails"="$($Emails.Count)"; "CVEs"="$($CVEs.count)"; "Total"="$($total)"} | Select Hostnames,IPv4s,URLs,FileHashes,Emails,CVEs,Total
-	$counts | Export-csv "$($exports)Total_Numbers_$($date.month)_$($date.day)_$($date.year).csv"
+	$counts = new-object PSObject -Property @{"Hostnames"="$($hostnames.count)"; "IPv4s"="$($IPv4s.count)"; "URLs"="$($URLs.Count)"; "FileHashes"="$($FileHashesEPO.count)"; "Emails"="$($Emails.Count)"; "CVEs"="$($CVEs.count)"; "Total"="$($total)"} | Select Hostnames,IPv4s,URLs,FileHashes,Emails,CVEs,Total
+	$counts | Export-csv "$($exports)Total_Numbers_$($date.month)_$($date.day)_$($date.year).csv" -NoTypeInformation
 	# Open exports folder and complete the operation.
 	write-host "Opening exports folder..." -foregroundcolor "green"
 	ii $exports
