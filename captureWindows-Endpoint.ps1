@@ -1,4 +1,4 @@
-# This function requires WinRM on remote machine to function properly and must be Winddows 7sp1 or higher. 
+# This function requires WinRM on remote machine to function properly and must be Windows 7sp1 or higher. 
 #
 function captureWindows-endpoint {
         $endpoint = $(read-host "Enter endpoint short name or FQDN")
