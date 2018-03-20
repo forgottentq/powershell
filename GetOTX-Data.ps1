@@ -1,19 +1,17 @@
 
 #
 # Powershell script to pull indicators from Alien Vault Opensource Threat Exchange(OTX) and export to CSVs for importing into Arcsight or other SIEM.
-#
+# Written by Wylie Bayes 02/23/2018
 #
 # Define Main Function, set variables to Null, and then define as arrays. 
-#
-# Required VARS to set are:  $otxkey, $exports, and $daysold
-#
 function GetOTX-Data {
 	clear
-	$otxkey = "YOUR API KEY HERE"
+	$otxkey = "YOUR API KEY GOES HERE!!"
 	# Define export location.
-	$exports = "C:\Exports\"
+	$exports = "C:\Exports"
+	$whitelists = "C:\Whitelists"
 	# How old are indicators allowed to be in days
-	$daysold = "90"
+	$daysold = "30"
 	#
 	$FileHashesEPO = $null
 	$FileHashesPalo = $null
@@ -80,6 +78,13 @@ function GetOTX-Data {
 	} else {
 		write-host "No previous CSV's to archive. Continuing" -foregroundcolor "Yellow"
 	}
+	# Pull in White Lists for Exclusions
+	$IPv4WL = Import-CSV "$whitelists\IPv4s.csv" | where {(get-date $_."WhiteListed Date") -gt (get-date).AddDays(-30)}
+	$CVEWL = Import-CSV "$whitelists\CVEs.csv" | where {(get-date $_."WhiteListed Date") -gt (get-date).AddDays(-30)}
+	$DomainOrHostnameWL = Import-CSV "$whitelists\DomainOrHostnames.csv" | where {(get-date $_."WhiteListed Date") -gt (get-date).AddDays(-30)}
+	$EmailWL = Import-CSV "$whitelists\Emails.csv" | where {(get-date $_."WhiteListed Date") -gt (get-date).AddDays(-30)}
+	$FileHashWL = Import-CSV "$whitelists\FileHashes.csv" | where {(get-date $_."WhiteListed Date") -gt (get-date).AddDays(-30)}
+	$URLWL = Import-CSV "$whitelists\URLs.csv" | where {(get-date $_."WhiteListed Date") -gt (get-date).AddDays(-30)}
 	# Get the date for naming CSV exports at the end.
 	$date = get-date
 	# Define a bit of regex for later
@@ -104,13 +109,13 @@ function GetOTX-Data {
 				if ($LastModified -gt (get-date).AddDays("-$daysold")){
 					foreach ($indicator in $Item.Indicators) {
 						# Gather Domain and Subdomain Names Indicators
-						if ($indicator.Type -eq "hostname" -or $indicator.type -eq "domain"){
+						if ($indicator.Type -eq "hostname" -or $indicator.type -eq "domain" -and $indicator.indicator -notin $DomainOrHostnameWL.DomainOrHostName){
 							if ($item.References -like "*http*") {
 								$hostnames += new-object PSObject -Property @{"Hostname"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select Hostname,Name,Reference
 							}
 						}
 						# Gather All IPV4 Indicators
-						if ($indicator.Type -eq "IPv4"){
+						if ($indicator.Type -eq "IPv4" -and $indicator.indicator -notin $IPv4WL."IPv4 Address"){
 							if ($item.References -like "*http*"){
 								$IPV4s += new-object PSObject -Property @{"IPv4 Address"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select "IPv4 Address",Name,Reference
 							}
@@ -122,13 +127,13 @@ function GetOTX-Data {
 							}
 						}
 						# Gather All URL Indicators
-						if ($indicator.Type -eq "URL"){
+						if ($indicator.Type -eq "URL" -and $indicator.indicator -notin $URLWL.URL){
 							if ($item.References -like "*http*"){
 								$URLs += new-object PSObject -Property @{"URL"="$($indicator.indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select URL,Name,Reference
 							}
 						}
 						# Gather all File Hash Indicators
-						if ($indicator.Type -eq "FileHash-MD5" -or $indicator.Type -eq "FileHash-SHA1" -or $indicator.Type -eq "Filehash-SHA256"){
+						if ($indicator.Type -eq "FileHash-MD5" -or $indicator.Type -eq "FileHash-SHA1" -or $indicator.Type -eq "Filehash-SHA256" -and $indicator.indicator -notin $FileHashWL.FileHash){
 							if ($item.References -like "*http*"){
 								if ($item.References -ne $null -and $item.References -like "*http*"){
 									$FileHashesEPO += new-object PSObject -Property @{"FileHash"="AppHash: $($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select FileHash,Name,Reference
@@ -137,12 +142,12 @@ function GetOTX-Data {
 							}
 						}
 						# Gather all Email Indicators
-						if ($indicator.Type -eq "email"){
+						if ($indicator.Type -eq "email" -and $indicator.indicator -notin $EmailWL."Email Address"){
 							if ($item.References -like "*http*"){
 								$Emails += new-object PSObject -Property @{"Email"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select Email,Name,Reference
 							}
 						}
-						if ($indicator.Type -eq "CVE"){
+						if ($indicator.Type -eq "CVE" -and $indicator.indicator -notin $CVEWL.CVE){
 							if ($item.References -like "*http*"){
 								$CVEs += new-object PSObject -Property @{"CVE"="$($indicator.Indicator)"; "Name"="$($name)"; "Reference"="$($item.References)"} | Select CVE,Name,Reference
 							}
@@ -185,3 +190,6 @@ function GetOTX-Data {
 	write-host "Opening exports folder..." -foregroundcolor "green"
 	ii $exports
 }
+
+getotx-data.txt
+Displaying getotx-data.txt.
