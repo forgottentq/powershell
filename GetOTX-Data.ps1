@@ -1,4 +1,3 @@
-
 #
 # Powershell script to pull indicators from Alien Vault Opensource Threat Exchange(OTX) and export to CSVs for importing into Arcsight or other SIEM.
 # Written by Wylie Bayes 02/23/2018
@@ -190,6 +189,3 @@ function GetOTX-Data {
 	write-host "Opening exports folder..." -foregroundcolor "green"
 	ii $exports
 }
-
-getotx-data.txt
-Displaying getotx-data.txt.
