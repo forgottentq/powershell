@@ -7,7 +7,7 @@ function GetOTX-Data {
 	clear
 	$otxkey = "YOUR API KEY GOES HERE!!"
 	# Define export location.
-	$exports = "C:\Exports"
+	$exports = "C:\Exports\"
 	$whitelists = "C:\Whitelists"
 	# How old are indicators allowed to be in days
 	$daysold = "30"
